@@ -164,30 +164,25 @@ resource "aws_instance" "web_server" {
               # Log everything for debugging
               exec > >(tee /var/log/user-data.log|logger -t user-data -s 2>/dev/console) 2>&1
               
-              echo "Starting Deployment on Amazon Linux 2..."
-              yum update -y
-              yum install python3 git -y
+              echo "Starting Final Deploy..."
+              # Fix: Explicitly install python3 AND python3-pip
+              dnf update -y
+              dnf install python3 python3-pip git -y
 
-              # Setup Application
+              # Navigate and setup
               cd /home/ec2-user
+              # Remove old folder if it exists to avoid clone errors
+              rm -rf Anuska-Portfolio
               git clone https://github.com/graj902/Anuska-Portfolio.git
               cd Anuska-Portfolio
 
-              # Flask requirement: index.html MUST be in /templates/
-              if [ ! -d "templates" ]; then
-                mkdir templates
-                mv index.html templates/ 2>/dev/null
-              fi
+              # Install Flask using the full path to pip3 to be safe
+              /usr/bin/pip3 install flask
 
-              # Install requirements
-              pip3 install -r requirements.txt
-
-              # Start the app on Port 80
-              echo "Launching Flask App..."
-              sudo python3 app.py > /home/ec2-user/app.log 2>&1 &
+              # Start the app on Port 80 using sudo
+              echo "Launching App..."
+              sudo /usr/bin/python3 app.py > /home/ec2-user/app.log 2>&1 &
               EOF
-
-  tags = { Name = "${var.project_name}-server" }
 }
 
 resource "aws_lb_target_group_attachment" "test" {
