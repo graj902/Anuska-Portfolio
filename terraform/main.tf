@@ -154,19 +154,36 @@ resource "aws_s3_bucket_policy" "public_read_policy" {
 
 # 5. EC2 Instance (Task 2 & 8)
 resource "aws_instance" "web_server" {
-  ami                    = "ami-0ff5003538b60d5ec" # Mumbai Amazon Linux 2023
+  ami                    = "ami-0ff5003538b60d5ec" # Amazon Linux 2 (Mumbai)
   instance_type          = var.instance_type
   subnet_id              = aws_subnet.pub_1.id
   vpc_security_group_ids = [aws_security_group.web_sg.id]
 
   user_data = <<-EOF
               #!/bin/bash
-              dnf update -y
-              dnf install python3 git -y
+              # Log everything for debugging
+              exec > >(tee /var/log/user-data.log|logger -t user-data -s 2>/dev/console) 2>&1
+              
+              echo "Starting Deployment on Amazon Linux 2..."
+              yum update -y
+              yum install python3 git -y
+
+              # Setup Application
+              cd /home/ec2-user
               git clone https://github.com/graj902/Anuska-Portfolio.git
               cd Anuska-Portfolio
+
+              # Flask requirement: index.html MUST be in /templates/
+              if [ ! -d "templates" ]; then
+                mkdir templates
+                mv index.html templates/ 2>/dev/null
+              fi
+
+              # Install requirements
               pip3 install -r requirements.txt
-              # Sudo is required to bind to port 80
+
+              # Start the app on Port 80
+              echo "Launching Flask App..."
               sudo python3 app.py > /home/ec2-user/app.log 2>&1 &
               EOF
 
