@@ -154,7 +154,7 @@ resource "aws_s3_bucket_policy" "public_read_policy" {
 
 # 5. EC2 Instance (Task 2 & 8)
 resource "aws_instance" "web_server" {
-  ami                    = "ami-0522dabe3a7407c92" # Mumbai Amazon Linux 2023
+  ami                    = "ami-0ff5003538b60d5ec" # Mumbai Amazon Linux 2023
   instance_type          = var.instance_type
   subnet_id              = aws_subnet.pub_1.id
   vpc_security_group_ids = [aws_security_group.web_sg.id]
