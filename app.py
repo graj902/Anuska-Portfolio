@@ -7,8 +7,8 @@ PROFILE_DATA = {
     "name": "Anushka Jaiswal",
     "role": "DevOps & MLOps Engineer",
     "linkedin": "https://www.linkedin.com/in/anushka-jaiswal-/",
-    "resume_link": "https://anuska-portfolio-assets-mumbai-2026.s3.ap-south-1.amazonaws.com/resume.pdf.pdf",
-    "image_url": "https://anuska-portfolio-assets-mumbai-2026.s3.ap-south-1.amazonaws.com/profile.jpeg"
+    "resume_link": "https://anuska-portfolio-assets-mumbai-2026.s3.ap-south-1.amazonaws.com/resume1.pdf", # Updated to resume1.pdf
+    "image_url": "https://anuska-portfolio-assets-mumbai-2026.s3.ap-south-1.amazonaws.com/profile.jpeg?v=102"
 }
 
 @app.route('/')
