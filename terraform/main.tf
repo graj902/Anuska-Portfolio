@@ -125,39 +125,6 @@ resource "aws_s3_bucket" "portfolio_bucket" {
   bucket = "anuska-portfolio-assets-mumbai-2026"
 }
 
-resource "aws_s3_bucket_versioning" "v" {
-  bucket = aws_s3_bucket.portfolio_bucket.id
-  versioning_configuration {
-    status = "Enabled"
-  }
-}
-
-# 5. EC2 Instance (Task 2)
-resource "aws_instance" "web_server" {
-  ami                    = "ami-0ff5003538b60d5ec"
-  instance_type          = var.instance_type
-  subnet_id              = aws_subnet.pub_1.id
-  vpc_security_group_ids = [aws_security_group.web_sg.id]
-  user_data              = <<-EOF
-              #!/bin/bash
-              dnf update -y
-              dnf install python3 git -y
-              git clone https://github.com/graj902/Anuska-Portfolio.git
-              cd Anuska-Portfolio
-              pip3 install -r requirements.txt
-              python3 app.py &
-              EOF
-  tags                   = { Name = "${var.project_name}-server" }
-}
-
-resource "aws_lb_target_group_attachment" "test" {
-  target_group_arn = aws_lb_target_group.tg.arn
-  target_id        = aws_instance.web_server.id
-  port             = 80
-}
-
-
-# 6. Disable Public Access Block (Allows the bucket to be public)
 resource "aws_s3_bucket_public_access_block" "portfolio_access" {
   bucket = aws_s3_bucket.portfolio_bucket.id
 
@@ -167,7 +134,6 @@ resource "aws_s3_bucket_public_access_block" "portfolio_access" {
   restrict_public_buckets = false
 }
 
-# 7. Apply the Public Read Policy
 resource "aws_s3_bucket_policy" "public_read_policy" {
   depends_on = [aws_s3_bucket_public_access_block.portfolio_access]
   bucket     = aws_s3_bucket.portfolio_bucket.id
@@ -184,4 +150,31 @@ resource "aws_s3_bucket_policy" "public_read_policy" {
       }
     ]
   })
+}
+
+# 5. EC2 Instance (Task 2 & 8)
+resource "aws_instance" "web_server" {
+  ami                    = "ami-0522dabe3a7407c92" # Mumbai Amazon Linux 2023
+  instance_type          = var.instance_type
+  subnet_id              = aws_subnet.pub_1.id
+  vpc_security_group_ids = [aws_security_group.web_sg.id]
+
+  user_data = <<-EOF
+              #!/bin/bash
+              dnf update -y
+              dnf install python3 git -y
+              git clone https://github.com/graj902/Anuska-Portfolio.git
+              cd Anuska-Portfolio
+              pip3 install -r requirements.txt
+              # Sudo is required to bind to port 80
+              sudo python3 app.py > /home/ec2-user/app.log 2>&1 &
+              EOF
+
+  tags = { Name = "${var.project_name}-server" }
+}
+
+resource "aws_lb_target_group_attachment" "test" {
+  target_group_arn = aws_lb_target_group.tg.arn
+  target_id        = aws_instance.web_server.id
+  port             = 80
 }
