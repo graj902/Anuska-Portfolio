@@ -1,8 +1,5 @@
-output "website_url" {
-  value = "http://${aws_instance.web_server.public_ip}"
-  description = "Public URL of the Portfolio website"
+output "alb_dns_name" {
+  value = aws_lb.main_alb.dns_name
+  description = "Use this DNS name in Route 53 to point your domain (Task 6)"
 }
-
-output "s3_bucket_name" {
-  value = aws_s3_bucket.portfolio_bucket.id
-}
+output "s3_bucket_name" { value = aws_s3_bucket.portfolio_bucket.id }

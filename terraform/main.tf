@@ -1,6 +1,4 @@
-provider "aws" {
-  region = var.region
-}
+provider "aws" { region = var.region }
 
 # 1. Networking (Task 2)
 resource "aws_vpc" "main" {
@@ -9,73 +7,81 @@ resource "aws_vpc" "main" {
   tags = { Name = "${var.project_name}-vpc" }
 }
 
-resource "aws_internet_gateway" "igw" {
+resource "aws_internet_gateway" "igw" { vpc_id = aws_vpc.main.id }
+
+resource "aws_subnet" "pub_1" {
   vpc_id = aws_vpc.main.id
+  cidr_block = "10.0.1.0/24"
+  availability_zone = "ap-south-1a"
+  map_public_ip_on_launch = true
 }
 
-resource "aws_subnet" "public_subnet" {
-  vpc_id                  = aws_vpc.main.id
-  cidr_block              = "10.0.1.0/24"
+resource "aws_subnet" "pub_2" {
+  vpc_id = aws_vpc.main.id
+  cidr_block = "10.0.2.0/24"
+  availability_zone = "ap-south-1b"
   map_public_ip_on_launch = true
 }
 
 resource "aws_route_table" "rt" {
   vpc_id = aws_vpc.main.id
-  route {
-    cidr_block = "0.0.0.0/0"
-    gateway_id = aws_internet_gateway.igw.id
-  }
+  route { cidr_block = "0.0.0.0/0"; gateway_id = aws_internet_gateway.igw.id }
 }
 
-resource "aws_route_table_association" "rta" {
-  subnet_id      = aws_subnet.public_subnet.id
-  route_table_id = aws_route_table.rt.id
-}
+resource "aws_route_table_association" "a" { subnet_id = aws_subnet.pub_1.id; route_table_id = aws_route_table.rt.id }
+resource "aws_route_table_association" "b" { subnet_id = aws_subnet.pub_2.id; route_table_id = aws_route_table.rt.id }
 
-# 2. Security Group (Task 2)
-resource "aws_security_group" "web_sg" {
-  name   = "portfolio-sg"
+# 2. Security Groups (Task 2 & 3)
+resource "aws_security_group" "alb_sg" {
+  name = "alb-sg"
   vpc_id = aws_vpc.main.id
-
-  ingress {
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  ingress {
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
+  ingress { from_port = 80; to_port = 80; protocol = "tcp"; cidr_blocks = ["0.0.0.0/0"] }
+  egress { from_port = 0; to_port = 0; protocol = "-1"; cidr_blocks = ["0.0.0.0/0"] }
 }
 
-# 3. S3 Bucket (Task 4)
-resource "aws_s3_bucket" "portfolio_bucket" {
-  bucket = "anuska-portfolio-assets-mumbai-2026"
+resource "aws_security_group" "web_sg" {
+  name = "web-sg"
+  vpc_id = aws_vpc.main.id
+  ingress { from_port = 80; to_port = 80; protocol = "tcp"; security_groups = [aws_security_group.alb_sg.id] }
+  ingress { from_port = 22; to_port = 22; protocol = "tcp"; cidr_blocks = ["0.0.0.0/0"] }
+  egress { from_port = 0; to_port = 0; protocol = "-1"; cidr_blocks = ["0.0.0.0/0"] }
 }
 
+# 3. Application Load Balancer (Task 3)
+resource "aws_lb" "main_alb" {
+  name = "portfolio-alb"
+  load_balancer_type = "application"
+  security_groups = [aws_security_group.alb_sg.id]
+  subnets = [aws_subnet.pub_1.id, aws_subnet.pub_2.id]
+}
+
+resource "aws_lb_target_group" "tg" {
+  name = "web-target-group"
+  port = 80
+  protocol = "HTTP"
+  vpc_id = aws_vpc.main.id
+}
+
+resource "aws_lb_listener" "front_end" {
+  load_balancer_arn = aws_lb.main_alb.arn
+  port = "80"
+  protocol = "HTTP"
+  default_action { type = "forward"; target_group_arn = aws_lb_target_group.tg.arn }
+}
+
+# 4. S3 Bucket (Task 4)
+resource "aws_s3_bucket" "portfolio_bucket" { bucket = "anuska-portfolio-assets-mumbai-2026" }
 resource "aws_s3_bucket_versioning" "v" {
   bucket = aws_s3_bucket.portfolio_bucket.id
   versioning_configuration { status = "Enabled" }
 }
 
-# 4. EC2 Instance (Task 2)
+# 5. EC2 Instance (Task 2)
 resource "aws_instance" "web_server" {
-  ami           = "ami-0522dabe3a7407c92" # Amazon Linux 2023 in Mumbai
+  ami = "ami-0522dabe3a7407c92"
   instance_type = var.instance_type
-  subnet_id     = aws_subnet.public_subnet.id
+  subnet_id = aws_subnet.pub_1.id
   vpc_security_group_ids = [aws_security_group.web_sg.id]
-
   user_data = <<-EOF
               #!/bin/bash
               dnf update -y
@@ -85,6 +91,11 @@ resource "aws_instance" "web_server" {
               pip3 install -r requirements.txt
               python3 app.py &
               EOF
-
   tags = { Name = "${var.project_name}-server" }
+}
+
+resource "aws_lb_target_group_attachment" "test" {
+  target_group_arn = aws_lb_target_group.tg.arn
+  target_id = aws_instance.web_server.id
+  port = 80
 }
